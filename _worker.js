@@ -524,7 +524,11 @@ function processVlessHeader(vlessBuffer, userID) {
 				vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength)
 			);
 			// 2001:0db8:85a3:0000:0000:8a2e:0370:7334
-
+			const ipv6 = [];
+			for (let i = 0; i < 8; i++) {
+				ipv6.push(dataView.getUint16(i * 2).toString(16));
+			}
+			addressValue = ipv6.join(':');
 			// seems no need add [] for ipv6
 			break;
 		default:
@@ -826,6 +830,9 @@ const generateRemark = (index, port) => {
             remark = `💦 BPB - IPv4_${index - 1} : ${port}`;
             break;
         case 4:
+        case 5:
+            remark = `💦 BPB - IPv6_${index - 3} : ${port}`;
+            break;
         default:
             remark = `💦 BPB - Clean IP_${index - 5} : ${port}`;
             break;
@@ -1023,6 +1030,7 @@ const getFragmentConfigs = async (env, hostName, client) => {
         hostName,
         "www.speedtest.net",
         ...resolved.ipv4,
+        ...resolved.ipv6.map((ip) => `[${ip}]`),
         ...(cleanIPs ? cleanIPs.split(",") : [])
     ];
 
@@ -1197,6 +1205,7 @@ const getSingboxConfig = async (env, hostName) => {
         hostName,
         "www.speedtest.net",
         ...resolved.ipv4,
+        ...resolved.ipv6.map((ip) => `[${ip}]`),
         ...(cleanIPs ? cleanIPs.split(",") : [])
     ];
 
@@ -1571,13 +1580,16 @@ const resolveDNS = async (domain) => {
         ]);
 
         const ipv4Addresses = await ipv4Response.json();
-
+        const ipv6Addresses = await ipv6Response.json();
 
         const ipv4 = ipv4Addresses.Answer
             ? ipv4Addresses.Answer.map((record) => record.data)
             : [];
+        const ipv6 = ipv6Addresses.Answer
+            ? ipv6Addresses.Answer.map((record) => record.data)
+            : [];
 
-        return { ipv4 };
+        return { ipv4, ipv6 };
     } catch (error) {
         console.error('Error resolving DNS:', error);
         throw new Error(`An error occurred while resolving DNS - ${error}`);
@@ -2400,7 +2412,7 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
             const hasSecurity = /security=/.test(chainProxy);
             const validSecurityType = /security=(tls|none|reality)/.test(chainProxy);
             const validTransmission = /type=(tcp|grpc|ws)/.test(chainProxy);
-            const validIPDomain = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+            const validIPDomain = /^((?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,})|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|\\[(?:[a-fA-F0-9]{1,4}:){7}[a-fA-F0-9]{1,4}\\]|\\[(?:[a-fA-F0-9]{1,4}:){1,7}:\\]|\\[(?:[a-fA-F0-9]{1,4}:){1,6}:[a-fA-F0-9]{1,4}\\]|\\[(?:[a-fA-F0-9]{1,4}:){1,5}(?::[a-fA-F0-9]{1,4}){1,2}\\]|\\[(?:[a-fA-F0-9]{1,4}:){1,4}(?::[a-fA-F0-9]{1,4}){1,3}\\]|\\[(?:[a-fA-F0-9]{1,4}:){1,3}(?::[a-fA-F0-9]{1,4}){1,4}\\]|\\[(?:[a-fA-F0-9]{1,4}:){1,2}(?::[a-fA-F0-9]{1,4}){1,5}\\]|\\[[a-fA-F0-9]{1,4}:(?::[a-fA-F0-9]{1,4}){1,6}\\]|\\[:(?::[a-fA-F0-9]{1,4}){1,7}\\]|\\[\\](?:::[a-fA-F0-9]{1,4}){1,7}\\])$/i;
             const checkedPorts = Array.from(document.querySelectorAll('input[name^="port-"]:checked')).map(input => input.name.split('-')[1]);
             const validEndpoint = /^(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,}|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|\\[(?:[a-fA-F0-9]{1,4}:){7}[a-fA-F0-9]{1,4}\\]|\\[(?:[a-fA-F0-9]{1,4}:){1,7}:\\]|\\[(?:[a-fA-F0-9]{1,4}:){1,6}:[a-fA-F0-9]{1,4}\\]|\\[(?:[a-fA-F0-9]{1,4}:){1,5}(?::[a-fA-F0-9]{1,4}){1,2}\\]|\\[(?:[a-fA-F0-9]{1,4}:){1,4}(?::[a-fA-F0-9]{1,4}){1,3}\\]|\\[(?:[a-fA-F0-9]{1,4}:){1,3}(?::[a-fA-F0-9]{1,4}){1,4}\\]|\\[(?:[a-fA-F0-9]{1,4}:){1,2}(?::[a-fA-F0-9]{1,4}){1,5}\\]|\\[[a-fA-F0-9]{1,4}:(?::[a-fA-F0-9]{1,4}){1,6}\\]|\\[:(?::[a-fA-F0-9]{1,4}){1,7}\\]|\\[::(?::[a-fA-F0-9]{1,4}){0,7}\\]):(?:[0-9]{1,5})$/;
             checkedPorts.forEach(port => formData.append('ports[]', port));
@@ -3039,8 +3051,8 @@ const singboxConfigTemp = {
                 outbound: "direct"
             },
             {
-                ip_cidr: ["224.0.0.0/3"],
-                source_ip_cidr: ["224.0.0.0/3"],
+                ip_cidr: ["224.0.0.0/3", "ff00::/8"],
+                source_ip_cidr: ["224.0.0.0/3", "ff00::/8"],
                 outbound: "block"
             }
         ],
@@ -3182,6 +3194,7 @@ const singboxWgOutboundTemp = {
     server: "engage.cloudflareclient.com",
     server_port: 2408,
     type: "wireguard",
+    domain_strategy: "prefer_ipv6",
     detour: "",
     tag: ""
 };
